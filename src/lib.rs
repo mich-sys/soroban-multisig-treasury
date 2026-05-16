@@ -102,8 +102,31 @@ impl MultisigTreasury {
         id
     }
 
-    pub fn approve(env: Env, caller: Address, proposal_id: u64) {
-        todo!()
+    pub fn approve(env: Env, approver: Address, proposal_id: u64) {
+        approver.require_auth();
+
+        let owners: Vec<Address> = env.storage().persistent().get(&DataKey::Owners).expect("not initialized");
+        if !owners.contains(&approver) {
+            panic!("not an owner");
+        }
+
+        let proposal: Proposal = env.storage().persistent().get(&DataKey::Proposal(proposal_id)).expect("proposal not found");
+        
+        if proposal.executed {
+            panic!("already executed");
+        }
+        if proposal.rejected {
+            panic!("already rejected");
+        }
+
+        let mut approvals: Vec<Address> = env.storage().persistent().get(&DataKey::Approvals(proposal_id)).unwrap_or_else(|| Vec::new(&env));
+        
+        if approvals.contains(&approver) {
+            panic!("already approved");
+        }
+
+        approvals.push_back(approver);
+        env.storage().persistent().set(&DataKey::Approvals(proposal_id), &approvals);
     }
 
     pub fn execute(env: Env, proposal_id: u64) {
