@@ -69,7 +69,37 @@ impl MultisigTreasury {
         amount: i128,
         description: String,
     ) -> u64 {
-        todo!()
+        proposer.require_auth();
+
+        let owners: Vec<Address> = env.storage().persistent().get(&DataKey::Owners).expect("not initialized");
+        if !owners.contains(&proposer) {
+            panic!("not an owner");
+        }
+
+        if amount <= 0 {
+            panic!("invalid amount");
+        }
+
+        let mut count: u64 = env.storage().persistent().get(&DataKey::ProposalCount).unwrap_or(0);
+        let id = count;
+
+        let proposal = Proposal {
+            id,
+            proposer: proposer.clone(),
+            recipient,
+            token,
+            amount,
+            description,
+            executed: false,
+            rejected: false,
+        };
+
+        env.storage().persistent().set(&DataKey::Proposal(id), &proposal);
+        
+        count += 1;
+        env.storage().persistent().set(&DataKey::ProposalCount, &count);
+
+        id
     }
 
     pub fn approve(env: Env, caller: Address, proposal_id: u64) {
