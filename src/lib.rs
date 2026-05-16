@@ -129,12 +129,58 @@ impl MultisigTreasury {
         env.storage().persistent().set(&DataKey::Approvals(proposal_id), &approvals);
     }
 
-    pub fn execute(env: Env, proposal_id: u64) {
-        todo!()
+    pub fn execute(env: Env, caller: Address, proposal_id: u64) {
+        caller.require_auth();
+
+        let owners: Vec<Address> = env.storage().persistent().get(&DataKey::Owners).expect("not initialized");
+        if !owners.contains(&caller) {
+            panic!("not an owner");
+        }
+
+        let mut proposal: Proposal = env.storage().persistent().get(&DataKey::Proposal(proposal_id)).expect("proposal not found");
+        
+        if proposal.executed {
+            panic!("already executed");
+        }
+        if proposal.rejected {
+            panic!("already rejected");
+        }
+
+        let approvals: Vec<Address> = env.storage().persistent().get(&DataKey::Approvals(proposal_id)).unwrap_or_else(|| Vec::new(&env));
+        let threshold: u32 = env.storage().persistent().get(&DataKey::Threshold).expect("not initialized");
+
+        if approvals.len() < threshold {
+            panic!("threshold not reached");
+        }
+
+        soroban_sdk::token::Client::new(&env, &proposal.token).transfer(&env.current_contract_address(), &proposal.recipient, &proposal.amount);
+
+        proposal.executed = true;
+        env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
     }
 
-    pub fn reject(env: Env, proposal_id: u64) {
-        todo!()
+    pub fn reject(env: Env, caller: Address, proposal_id: u64) {
+        caller.require_auth();
+
+        let owners: Vec<Address> = env.storage().persistent().get(&DataKey::Owners).expect("not initialized");
+        if !owners.contains(&caller) {
+            panic!("not an owner");
+        }
+
+        let mut proposal: Proposal = env.storage().persistent().get(&DataKey::Proposal(proposal_id)).expect("proposal not found");
+        
+        if proposal.executed {
+            panic!("already executed");
+        }
+        if proposal.rejected {
+            panic!("already rejected");
+        }
+
+        proposal.rejected = true;
+        env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+
+        let empty_approvals: Vec<Address> = Vec::new(&env);
+        env.storage().persistent().set(&DataKey::Approvals(proposal_id), &empty_approvals);
     }
 }
 
