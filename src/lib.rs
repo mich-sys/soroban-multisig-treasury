@@ -30,7 +30,35 @@ pub struct MultisigTreasury;
 #[contractimpl]
 impl MultisigTreasury {
     pub fn initialize(env: Env, owners: Vec<Address>, threshold: u32) {
-        todo!()
+        if env.storage().persistent().has(&DataKey::Owners) {
+            panic!("already initialized");
+        }
+
+        if owners.is_empty() {
+            panic!("owners list is empty");
+        }
+
+        if threshold == 0 {
+            panic!("threshold must be at least 1");
+        }
+
+        if threshold > owners.len() {
+            panic!("threshold cannot be greater than the number of owners");
+        }
+
+        // Validate no duplicate addresses and require auth
+        let mut unique_owners = Vec::new(&env);
+        for owner in owners.iter() {
+            owner.require_auth();
+            if unique_owners.contains(&owner) {
+                panic!("duplicate owner address");
+            }
+            unique_owners.push_back(owner);
+        }
+
+        env.storage().persistent().set(&DataKey::Owners, &owners);
+        env.storage().persistent().set(&DataKey::Threshold, &threshold);
+        env.storage().persistent().set(&DataKey::ProposalCount, &0u64);
     }
 
     pub fn propose(
