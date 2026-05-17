@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Symbol, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -95,6 +95,15 @@ impl MultisigTreasury {
         };
 
         env.storage().persistent().set(&DataKey::Proposal(id), &proposal);
+        env.events().publish(
+            (Symbol::new(&env, "propose"), id),
+            (
+                proposal.proposer.clone(),
+                proposal.recipient.clone(),
+                proposal.token.clone(),
+                proposal.amount,
+            ),
+        );
         
         count += 1;
         env.storage().persistent().set(&DataKey::ProposalCount, &count);
@@ -125,8 +134,13 @@ impl MultisigTreasury {
             panic!("already approved");
         }
 
+        let approver_clone = approver.clone();
         approvals.push_back(approver);
         env.storage().persistent().set(&DataKey::Approvals(proposal_id), &approvals);
+        env.events().publish(
+            (Symbol::new(&env, "approve"), proposal_id),
+            (approver_clone, approvals.len() as u32),
+        );
     }
 
     pub fn execute(env: Env, caller: Address, proposal_id: u64) {
@@ -157,6 +171,10 @@ impl MultisigTreasury {
 
         proposal.executed = true;
         env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+        env.events().publish(
+            (Symbol::new(&env, "execute"), proposal_id),
+            (proposal.recipient.clone(), proposal.amount),
+        );
     }
 
     pub fn reject(env: Env, caller: Address, proposal_id: u64) {
@@ -178,6 +196,10 @@ impl MultisigTreasury {
 
         proposal.rejected = true;
         env.storage().persistent().set(&DataKey::Proposal(proposal_id), &proposal);
+        env.events().publish(
+            (Symbol::new(&env, "reject"), proposal_id),
+            caller.clone(),
+        );
 
         let empty_approvals: Vec<Address> = Vec::new(&env);
         env.storage().persistent().set(&DataKey::Approvals(proposal_id), &empty_approvals);
