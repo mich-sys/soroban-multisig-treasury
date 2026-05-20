@@ -204,6 +204,41 @@ impl MultisigTreasury {
         let empty_approvals: Vec<Address> = Vec::new(&env);
         env.storage().persistent().set(&DataKey::Approvals(proposal_id), &empty_approvals);
     }
+
+    pub fn get_proposal(env: Env, proposal_id: u64) -> Proposal {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Proposal(proposal_id))
+            .expect("proposal not found")
+    }
+
+    pub fn get_approvals(env: Env, proposal_id: u64) -> Vec<Address> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Approvals(proposal_id))
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    pub fn list_owners(env: Env) -> Vec<Address> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Owners)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    pub fn get_threshold(env: Env) -> u32 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Threshold)
+            .unwrap_or(0)
+    }
+
+    pub fn get_proposal_count(env: Env) -> u64 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::ProposalCount)
+            .unwrap_or(0)
+    }
 }
 
 #[cfg(test)]
@@ -390,5 +425,106 @@ mod test {
         let id = client.propose(&owner1, &recipient, &token, &amount, &description);
         client.approve(&owner1, &id);
         client.approve(&owner1, &id); // Should panic with "already approved"
+    }
+
+    #[test]
+    fn test_view_proposal() {
+        let (env, client) = create_env();
+        let owner1 = Address::generate(&env);
+        let owners = soroban_sdk::vec![&env, owner1.clone()];
+        client.initialize(&owners, &1);
+
+        let recipient = Address::generate(&env);
+        let token = Address::generate(&env);
+        let amount = 1000i128;
+        let description = String::from_str(&env, "Test proposal");
+
+        let id = client.propose(&owner1, &recipient, &token, &amount, &description);
+        let proposal = client.get_proposal(&id);
+        
+        assert_eq!(proposal.id, id);
+        assert_eq!(proposal.proposer, owner1);
+        assert_eq!(proposal.recipient, recipient);
+        assert_eq!(proposal.token, token);
+        assert_eq!(proposal.amount, amount);
+        assert_eq!(proposal.description, description);
+        assert_eq!(proposal.executed, false);
+        assert_eq!(proposal.rejected, false);
+    }
+
+    #[test]
+    #[should_panic(expected = "proposal not found")]
+    fn test_view_proposal_not_found() {
+        let (env, client) = create_env();
+        let owner1 = Address::generate(&env);
+        let owners = soroban_sdk::vec![&env, owner1.clone()];
+        client.initialize(&owners, &1);
+
+        client.get_proposal(&999);
+    }
+
+    #[test]
+    fn test_view_approvals() {
+        let (env, client) = create_env();
+        let owner1 = Address::generate(&env);
+        let owners = soroban_sdk::vec![&env, owner1.clone()];
+        client.initialize(&owners, &1);
+
+        let recipient = Address::generate(&env);
+        let token = Address::generate(&env);
+        let amount = 1000i128;
+        let description = String::from_str(&env, "Test proposal");
+
+        let id = client.propose(&owner1, &recipient, &token, &amount, &description);
+        
+        let approvals_before = client.get_approvals(&id);
+        assert_eq!(approvals_before.len(), 0);
+
+        client.approve(&owner1, &id);
+        let approvals_after = client.get_approvals(&id);
+        assert_eq!(approvals_after.len(), 1);
+        assert_eq!(approvals_after.get(0).unwrap(), owner1);
+    }
+
+    #[test]
+    fn test_view_owners() {
+        let (env, client) = create_env();
+        let owner1 = Address::generate(&env);
+        let owner2 = Address::generate(&env);
+        let owners = soroban_sdk::vec![&env, owner1.clone(), owner2.clone()];
+        client.initialize(&owners, &2);
+
+        let retrieved_owners = client.list_owners();
+        assert_eq!(retrieved_owners.len(), 2);
+        assert_eq!(retrieved_owners.get(0).unwrap(), owner1);
+        assert_eq!(retrieved_owners.get(1).unwrap(), owner2);
+    }
+
+    #[test]
+    fn test_view_threshold() {
+        let (env, client) = create_env();
+        let owner1 = Address::generate(&env);
+        let owners = soroban_sdk::vec![&env, owner1.clone()];
+        client.initialize(&owners, &1);
+
+        assert_eq!(client.get_threshold(), 1);
+    }
+
+    #[test]
+    fn test_view_proposal_count() {
+        let (env, client) = create_env();
+        let owner1 = Address::generate(&env);
+        let owners = soroban_sdk::vec![&env, owner1.clone()];
+        client.initialize(&owners, &1);
+
+        assert_eq!(client.get_proposal_count(), 0);
+
+        let recipient = Address::generate(&env);
+        let token = Address::generate(&env);
+        let amount = 1000i128;
+        let description = String::from_str(&env, "Test proposal");
+
+        client.propose(&owner1, &recipient, &token, &amount, &description);
+        assert_eq!(client.get_proposal_count(), 1);
     }
 }
