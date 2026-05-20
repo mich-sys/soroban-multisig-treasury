@@ -74,4 +74,4 @@ The contract publishes diagnostic events for key transactions to enable indexing
 | `reject` | `(Symbol::new(env, "reject"), proposal_id: u64)` | `caller: Address` |
 
 ## Contributing
-We welcome contributions to the Soroban Multisig Treasury contract. If you identify bugs, design gaps, or performance improvements, please check our open GitHub issues or submit a pull request. This project is proudly built in alignment with the Stellar Wave Program to support robust tooling and open-source infrastructure across the Stellar network ecosystem.
+We welcome contributions to the Soroban Multisig Treasury contract. If you identify bugs, design gaps, or performance improvements, please check our open GitHub issues or submit a pull request.
